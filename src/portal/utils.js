@@ -27,3 +27,21 @@ export function bloodGroupSplit(n) {
 }
 
 /* ---------- shared bits ---------- */
+
+/* Generic sorter. key looks like "units-desc"; getters maps "units" -> row => value.
+   Rows whose value is null/undefined (e.g. upcoming camps with no units yet) always go last. */
+export function sortBy(list, key, getters) {
+  const [field, dir] = String(key).split("-");
+  const get = getters[field];
+  if (!get) return list;
+  const m = dir === "desc" ? -1 : 1;
+  return [...list].sort((a, b) => {
+    const x = get(a);
+    const y = get(b);
+    const xn = x === null || x === undefined;
+    const yn = y === null || y === undefined;
+    if (xn || yn) return xn === yn ? 0 : xn ? 1 : -1;
+    if (typeof x === "string") return x.localeCompare(y, undefined, { sensitivity: "base" }) * m;
+    return (x - y) * m;
+  });
+}

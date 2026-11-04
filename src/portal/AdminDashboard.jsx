@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { campRequests, organisations, portalCamps, portalDonors } from "./data";
-import { bloodGroupSplit, formatDate, formatNumber, sumBy } from "./utils";
+import { bloodGroupSplit, formatDate, formatNumber, sortBy, sumBy } from "./utils";
 import { PageHero } from "../components/PageHero";
 import { BarChart, LogoutButton, SectionHead, StatCard } from "./components";
 
@@ -9,7 +9,11 @@ function AdminDashboard() {
   const [tab, setTab] = useState("overview");
   const [qCamp, setQCamp] = useState("");
   const [city, setCity] = useState("All");
+  const [campSort, setCampSort] = useState("default");
   const [qDonor, setQDonor] = useState("");
+  const [qOrg, setQOrg] = useState("");
+  const [orgCity, setOrgCity] = useState("All");
+  const [orgSort, setOrgSort] = useState("default");
   const [reqs, setReqs] = useState(
     campRequests.map((item) => ({
       ...item,
@@ -21,10 +25,40 @@ function AdminDashboard() {
   const pending = reqs.filter((item) => item.state === "pending").length;
   const cities = ["All", ...Array.from(new Set(portalCamps.map((item) => item.city)))];
   const orgOf = (id) => organisations.find((item) => item.id === id);
-  const camps = portalCamps.filter(
-    (item) =>
-      (city === "All" || item.city === city) &&
-      (item.name + " " + orgOf(item.orgId).org).toLowerCase().includes(qCamp.toLowerCase()),
+  const camps = sortBy(
+    portalCamps.filter(
+      (item) =>
+        (city === "All" || item.city === city) &&
+        (item.name + " " + orgOf(item.orgId).org).toLowerCase().includes(qCamp.toLowerCase()),
+    ),
+    campSort,
+    {
+      name: (item) => item.name,
+      units: (item) => (item.status === "Completed" ? item.units : null),
+      crowd: (item) => (item.status === "Completed" ? item.crowd : null),
+      date: (item) => item.date,
+    },
+  );
+  const orgCities = ["All", ...Array.from(new Set(organisations.map((item) => item.city)))];
+  const orgRows = sortBy(
+    organisations
+      .filter(
+        (item) =>
+          (orgCity === "All" || item.city === orgCity) &&
+          (item.org + " " + item.contact + " " + item.type)
+            .toLowerCase()
+            .includes(qOrg.toLowerCase()),
+      )
+      .map((item) => {
+        const l = portalCamps.filter((entry) => entry.orgId === item.id);
+        return { ...item, campCount: l.length, units: sumBy(l, "units") };
+      }),
+    orgSort,
+    {
+      org: (item) => item.org,
+      camps: (item) => item.campCount,
+      units: (item) => item.units,
+    },
   );
   const donors = portalDonors.filter((item) =>
     (item.name + " " + item.city + " " + item.group).toLowerCase().includes(qDonor.toLowerCase()),
@@ -134,6 +168,21 @@ function AdminDashboard() {
                     <option key={item}>{item}</option>
                   ))}
                 </select>
+                <select
+                  aria-label="Sort camps"
+                  value={campSort}
+                  onChange={(event) => setCampSort(event.target.value)}
+                >
+                  <option value="default">Sort: Default</option>
+                  <option value="name-asc">Camp name (A → Z)</option>
+                  <option value="name-desc">Camp name (Z → A)</option>
+                  <option value="units-asc">Units (Low → High)</option>
+                  <option value="units-desc">Units (High → Low)</option>
+                  <option value="crowd-asc">Crowd (Low → High)</option>
+                  <option value="crowd-desc">Crowd (High → Low)</option>
+                  <option value="date-desc">Date (Newest first)</option>
+                  <option value="date-asc">Date (Oldest first)</option>
+                </select>
               </div>
               <div className="hc-table-wrap">
                 <table className="hc-table">
@@ -234,6 +283,31 @@ function AdminDashboard() {
 
           {tab === "orgs" && (
             <div className="hc-card">
+              <div className="hc-filters">
+                <input
+                  placeholder="Search organisation, contact or type…"
+                  value={qOrg}
+                  onChange={(event) => setQOrg(event.target.value)}
+                />
+                <select value={orgCity} onChange={(event) => setOrgCity(event.target.value)}>
+                  {orgCities.map((item) => (
+                    <option key={item}>{item}</option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Sort organisations"
+                  value={orgSort}
+                  onChange={(event) => setOrgSort(event.target.value)}
+                >
+                  <option value="default">Sort: Default</option>
+                  <option value="org-asc">Organisation (A → Z)</option>
+                  <option value="org-desc">Organisation (Z → A)</option>
+                  <option value="camps-asc">Camps (Low → High)</option>
+                  <option value="camps-desc">Camps (High → Low)</option>
+                  <option value="units-asc">Units collected (Low → High)</option>
+                  <option value="units-desc">Units collected (High → Low)</option>
+                </select>
+              </div>
               <div className="hc-table-wrap">
                 <table className="hc-table">
                   <thead>
@@ -247,21 +321,25 @@ function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {organisations.map((item) => {
-                      const l = portalCamps.filter((entry) => entry.orgId === item.id);
-                      return (
-                        <tr key={item.id}>
-                          <td>
-                            <strong>{item.org}</strong>
-                          </td>
-                          <td>{item.type}</td>
-                          <td>{item.contact}</td>
-                          <td>{item.city}</td>
-                          <td>{l.length}</td>
-                          <td>{formatNumber(sumBy(l, "units"))}</td>
-                        </tr>
-                      );
-                    })}
+                    {orgRows.map((item) => (
+                      <tr key={item.id}>
+                        <td>
+                          <strong>{item.org}</strong>
+                        </td>
+                        <td>{item.type}</td>
+                        <td>{item.contact}</td>
+                        <td>{item.city}</td>
+                        <td>{item.campCount}</td>
+                        <td>{formatNumber(item.units)}</td>
+                      </tr>
+                    ))}
+                    {orgRows.length === 0 && (
+                      <tr>
+                        <td colSpan="6" className="hc-empty">
+                          No organisations match your search.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

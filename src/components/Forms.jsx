@@ -1,6 +1,19 @@
+import { useState } from "react";
 import { useFormSubmit } from "../hooks/useFormSubmit";
-import { Input, Select, SubmitButton, Textarea } from "./FormFields";
+import { Input, PhoneInput, Select, SubmitButton, Textarea } from "./FormFields";
 import { bloodGroups, donorCities, volunteerCities } from "../data/content";
+
+const MIN_DONOR_AGE = 18;
+const pad = (n) => String(n).padStart(2, "0");
+const toISO = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+// latest allowed date of birth = today minus the minimum age
+function maxDobForMinAge(age) {
+  const t = new Date();
+  return toISO(new Date(t.getFullYear() - age, t.getMonth(), t.getDate()));
+}
+const DOB_MSG = "You must be at least " + MIN_DONOR_AGE + " years old to register as a donor.";
+// a name/state that is only spaces should not count as filled in
+const NOT_BLANK = ".*\\S.*";
 
 export function DonorForm() {
   const { status, submit, reset } = useFormSubmit();
@@ -14,20 +27,30 @@ export function DonorForm() {
         required
         placeholder="you@example.com"
       />
-      <Input label="Phone Number" name="phone" type="tel" required placeholder="+91" />
-      <Input label="Date of Birth" name="dob" type="date" required />
+      <PhoneInput label="Phone Number" name="phone" required placeholder="+91" />
+      <Input
+        label="Date of Birth"
+        name="dob"
+        type="date"
+        required
+        max={maxDobForMinAge(MIN_DONOR_AGE)}
+        title={DOB_MSG}
+        onInput={(e) => e.target.setCustomValidity("")}
+        onInvalid={(e) =>
+          e.target.setCustomValidity(e.target.validity.valueMissing ? "" : DOB_MSG)
+        }
+      />
       <Select
         label="Gender"
         name="gender"
         required
-        options={["Male", "Female"]}
+        options={["Male", "Female", "Third Gender"]}
         placeholder="Select gender"
       />
       <Select
         label="Blood Group"
         name="bloodGroup"
-        required
-        options={bloodGroups}
+        options={[...bloodGroups, "Not Sure"]}
         placeholder="Select Blood Group"
       />
       <Select
@@ -48,9 +71,16 @@ export function CampForm({ defaultCity = "", idPrefix = "camp" }) {
   const { status, submit, reset } = useFormSubmit();
   return (
     <form className="form" onSubmit={(i) => submit(i, "camp")} id={idPrefix}>
-      <Input label="Your name" name="name" required placeholder="Full name" />
+      <Input
+        label="Your name"
+        name="name"
+        required
+        pattern={NOT_BLANK}
+        title="Please enter your name"
+        placeholder="Full name"
+      />
       <Input label="Your email" name="email" type="email" required placeholder="you@example.com" />
-      <Input label="Phone Number" name="phone" type="tel" required placeholder="+91" />
+      <PhoneInput label="Phone Number" name="phone" required placeholder="+91" />
       <Input
         key={defaultCity}
         label="City"
@@ -59,7 +89,14 @@ export function CampForm({ defaultCity = "", idPrefix = "camp" }) {
         defaultValue={defaultCity}
         placeholder="Your city"
       />
-      <Input label="State" name="state" placeholder="Your state" />
+      <Input
+        label="State"
+        name="state"
+        required
+        pattern={NOT_BLANK}
+        title="Please enter your state"
+        placeholder="Your state"
+      />
       <Input
         label="Name of your Organisation"
         name="organisation"
@@ -74,8 +111,15 @@ export function CampForm({ defaultCity = "", idPrefix = "camp" }) {
 }
 export function VolunteerForm() {
   const { status, submit, reset } = useFormSubmit();
+  const [education, setEducation] = useState("");
+  // Year of Graduation / Organization are optional when Education Detail is "Other"
+  const detailsRequired = education !== "Other";
   return (
-    <form className="form" onSubmit={(r) => submit(r, "volunteer")}>
+    <form
+      className="form"
+      onSubmit={(r) => submit(r, "volunteer")}
+      onReset={() => setEducation("")}
+    >
       <Input label="Your Name" name="name" required placeholder="Full name" />
       <Input
         label="Email Address"
@@ -84,15 +128,26 @@ export function VolunteerForm() {
         required
         placeholder="you@example.com"
       />
-      <Input label="Phone" name="phone" type="tel" required placeholder="+91" />
+      <PhoneInput label="Phone" name="phone" required placeholder="+91" />
       <Select
         label="Education Detail"
         name="education"
         required
         options={["Student", "Professional", "Other"]}
+        onChange={(e) => setEducation(e.target.value)}
       />
-      <Input label="Year of Graduation" name="gradYear" required placeholder="e.g. 2027" />
-      <Input label="Organization" name="organization" required placeholder="College / Company" />
+      <Input
+        label="Year of Graduation"
+        name="gradYear"
+        required={detailsRequired}
+        placeholder="e.g. 2027"
+      />
+      <Input
+        label="Organization"
+        name="organization"
+        required={detailsRequired}
+        placeholder="College / Company"
+      />
       <Select
         label="City in which you wish to volunteer"
         name="city"
@@ -157,7 +212,7 @@ export function ContactForm() {
         required
         placeholder="you@example.com"
       />
-      <Input label="Phone Number" name="phone" type="tel" required placeholder="+91" />
+      <PhoneInput label="Phone Number" name="phone" required placeholder="+91" />
       <Input label="City" name="city" required placeholder="Your city" />
       <Textarea label="Your message (optional)" name="message" />
       <div className="form__submit">

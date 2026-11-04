@@ -18,6 +18,32 @@ export function Input({ label, required, full, ...r }) {
     </Field>
   );
 }
+/* Phone number: digits only (optional leading +91), 10-digit Indian mobile starting 6-9 */
+const PHONE_MSG = "Enter a valid 10-digit mobile number (digits only, e.g. 9876543210).";
+export function PhoneInput({ label = "Phone Number", required, full, ...r }) {
+  return (
+    <Field label={label} required={required} full={full}>
+      <input
+        type="tel"
+        inputMode="tel"
+        autoComplete="tel"
+        required={required}
+        pattern="(\+?91)?[6-9][0-9]{9}"
+        maxLength={13}
+        title={PHONE_MSG}
+        onInput={(e) => {
+          // block letters/symbols as the user types; keep only digits and a leading +
+          e.target.value = e.target.value.replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "");
+          e.target.setCustomValidity("");
+        }}
+        onInvalid={(e) =>
+          e.target.setCustomValidity(e.target.validity.valueMissing ? "" : PHONE_MSG)
+        }
+        {...r}
+      />
+    </Field>
+  );
+}
 export function Select({
   label,
   required,
@@ -29,7 +55,7 @@ export function Select({
   return (
     <Field label={label} required={required} full={full}>
       <select required={required} defaultValue="" {...i}>
-        <option value="" disabled>
+        <option value="" disabled={required}>
           {placeholder}
         </option>
         {options.map((item) => (
